@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ConfigCenter 控制台</title>
+<style>
+body { font-family: system-ui, sans-serif; margin: 2rem; color: #222; }
+pre { background: #f5f5f5; padding: 1rem; border-radius: 6px; }
+button { margin-top: .5rem; }
+table { border-collapse: collapse; margin-top: 1rem; }
+td, th { border: 1px solid #ccc; padding: .4rem .8rem; }
+</style>
+</head>
+<body>
+<h1>ConfigCenter 配置控制台</h1>
+<div>
+  <label>App <input id="app" value="checkout"></label>
+  <label>Group <input id="group" value="default"></label>
+  <button id="refresh">刷新配置</button>
+</div>
+<h2>当前快照</h2>
+<pre id="snapshot">(空)</pre>
+<h2>发布配置</h2>
+<div><label>Key <input id="key" placeholder="timeout.ms"></label>
+<label>Value <input id="value" placeholder="1500"></label>
+<button id="publish">发布</button></div>
+<div><label>回滚版本 <input id="rollbackRev" placeholder="1"></label>
+<button id="rollback">回滚</button></div>
+<h2>服务状态</h2>
+<pre id="status">(空)</pre>
+<script>
+const $ = id => document.getElementById(id);
+async function refresh() {
+  const r = await fetch('/api/pull?app=' + encodeURIComponent($('app').value) +
+    '&group=' + encodeURIComponent($('group').value));
+  $('snapshot').textContent = JSON.stringify(await r.json(), null, 2);
+}
+async function status() {
+  const r = await fetch('/api/status');
+  $('status').textContent = JSON.stringify(await r.json(), null, 2);
+}
+$('refresh').onclick = refresh;
+$('publish').onclick = async () => {
+  await fetch('/api/publish', { method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ app: $('app').value, group: $('group').value,
+      entries: { [$('key').value]: $('value').value } }) });
+  refresh();
+};
+$('rollback').onclick = async () => {
+  await fetch('/api/rollback', { method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ app: $('app').value, group: $('group').value,
+      revision: Number($('rollbackRev').value) }) });
+  refresh();
+};
+refresh();
+status();
+</script>
+</body>
+</html>
