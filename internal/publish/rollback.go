@@ -5,8 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
-
 	"confighub/internal/audit"
 	"confighub/internal/model"
 	"confighub/internal/store"
@@ -25,7 +23,11 @@ func (p *Publisher) Rollback(ctx context.Context, app model.AppID, group model.G
 		return model.Failed(ErrVersionNotFound)
 	}
 	rev := p.st.Revision()
-	batchID := uuid.NewString()
+	// Reuse the batch ID of the revision being restored so the rollback
+	// stays on the same config lineage instead of being recorded as a new,
+	// unrelated publish. Audit, checksum, and version history then all
+	// point back at the original batch.
+	batchID := rec.BatchID
 	txn := store.NewTxn(batchID, ns, rec.Entries, rev+1)
 	_ = p.st.Commit(txn)
 	snap := p.st.Snapshot(app, group)

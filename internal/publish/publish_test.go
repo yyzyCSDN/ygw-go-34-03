@@ -66,6 +66,59 @@ func TestPublishAndRollbackRoundTrip(t *testing.T) {
 	}
 }
 
+func TestRollbackPreservesBatchLineage(t *testing.T) {
+	st := store.New()
+	versions := version.New()
+	registry := watch.NewRegistry()
+	hub := watch.NewHub(registry)
+	journal := audit.New()
+	metrics := metric.New()
+	grader := publish.NewGrader()
+	p := publish.New(st, versions, hub, journal, metrics, grader, time.Second, 3)
+
+	b1 := model.NewBatch("app", "group", map[model.Key]string{"k": "v1"})
+	res1 := p.Publish(context.Background(), &b1)
+	if res1.Error != nil {
+		t.Fatalf("publish failed: %v", res1.Error)
+	}
+	originalBatch := res1.BatchID
+
+	b2 := model.NewBatch("app", "group", map[model.Key]string{"k": "v2"})
+	if r := p.Publish(context.Background(), &b2); r.Error != nil {
+		t.Fatalf("second publish failed: %v", r.Error)
+	}
+
+	// Roll back to the first revision. The restored content must carry the
+	// same batch ID as the original publish so audit, checksum, and version
+	// history stay on one config lineage.
+	res3 := p.Rollback(context.Background(), "app", "group", res1.Revision)
+	if res3.Error != nil {
+		t.Fatalf("rollback failed: %v", res3.Error)
+	}
+	if res3.BatchID != originalBatch {
+		t.Fatalf("rollback broke lineage: got batch %s, want %s", res3.BatchID, originalBatch)
+	}
+
+	// Store, snapshot, and the audit trail must all agree on the batch.
+	snap := st.Snapshot("app", "group")
+	if snap.BatchID != originalBatch {
+		t.Fatalf("store batch = %s, want %s", snap.BatchID, originalBatch)
+	}
+	tail := journal.Tail(1)
+	if len(tail) != 1 || tail[0].BatchID != originalBatch {
+		t.Fatalf("audit batch = %+v, want %s", tail, originalBatch)
+	}
+	if tail[0].Kind != model.EventRollback {
+		t.Fatalf("audit kind = %s, want rollback", tail[0].Kind)
+	}
+
+	// A fresh rollback target must still resolve to this same lineage.
+	rec, ok := versions.Lookup(res3.Revision)
+	if !ok || rec.BatchID != originalBatch {
+		t.Fatalf("version record batch = %+v, want %s", rec, originalBatch)
+	}
+}
+
 func TestGrayEvaluateBasics(t *testing.T) {
 	grader := publish.NewGrader()
 	plan := &model.GrayPlan{
