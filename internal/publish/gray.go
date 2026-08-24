@@ -30,12 +30,15 @@ func (g *Grader) Get(app model.AppID, group model.GroupID) (*model.GrayPlan, boo
 	return plan, ok
 }
 
-func (g *Grader) Evaluate(plan *model.GrayPlan, cursor int64) bool {
+// Evaluate reports whether a namespace is eligible to receive the gray
+// revision. Eligibility is a pure function of the plan (percent hash and
+// excluded groups) so that the rollout fraction is stable and independent of
+// any client's history. A freshly connected client with no prior cursor must
+// be judged by the same rule as everyone else; factoring the cursor in
+// stranded new clients on the captured baseline forever.
+func (g *Grader) Evaluate(plan *model.GrayPlan) bool {
 	if plan == nil {
 		return true
-	}
-	if cursor < plan.CapturedRevision {
-		return false
 	}
 	for _, group := range plan.ExcludedGroups {
 		if group == plan.Group {

@@ -30,16 +30,6 @@ func (c *Cache) Store(app model.AppID, group model.GroupID, snap *model.Snapshot
 	c.values[model.NamespaceKey(app, group)] = snap
 }
 
-func (c *Cache) Revision(app model.AppID, group model.GroupID) int64 {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	snap, ok := c.values[model.NamespaceKey(app, group)]
-	if !ok {
-		return 0
-	}
-	return snap.Revision
-}
-
 func (c *Cache) ApplyEvent(ev model.Event) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()

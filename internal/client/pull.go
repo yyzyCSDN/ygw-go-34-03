@@ -25,7 +25,7 @@ func New(st *store.Store, versions *version.Table, grader *publish.Grader, cache
 
 func (c *Client) Pull(app model.AppID, group model.GroupID, etag string) (*model.Snapshot, bool) {
 	snap := c.store.Snapshot(app, group)
-	if plan, ok := c.grader.Get(app, group); ok && !c.grader.Evaluate(plan, c.cache.Revision(app, group)) {
+	if plan, ok := c.grader.Get(app, group); ok && !c.grader.Evaluate(plan) {
 		if rec, ok := c.versions.Lookup(plan.CapturedRevision); ok {
 			snap = snapshotFromRecord(app, group, rec)
 		}

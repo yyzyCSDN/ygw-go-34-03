@@ -72,19 +72,36 @@ func TestGrayEvaluateBasics(t *testing.T) {
 		App:              "app",
 		Group:            "group",
 		Percent:          100,
-		CapturedRevision: 0,
+		CapturedRevision: 5,
 	}
-	if !grader.Evaluate(plan, 0) {
+	if !grader.Evaluate(plan) {
 		t.Fatal("full rollout should be eligible")
 	}
 	plan.Percent = 0
-	if grader.Evaluate(plan, 0) {
+	if grader.Evaluate(plan) {
 		t.Fatal("zero percent rollout should be ineligible")
 	}
 	plan.Percent = 100
 	plan.ExcludedGroups = []model.GroupID{"group"}
-	if grader.Evaluate(plan, 0) {
+	if grader.Evaluate(plan) {
 		t.Fatal("excluded group should be ineligible")
+	}
+}
+
+// A namespace with no prior history (cursor 0) must be judged by the same
+// rule as one that has already advanced past the captured baseline. The old
+// implementation compared the client cursor against CapturedRevision and
+// stranded brand-new clients on the old revision forever.
+func TestGrayEvaluateIgnoresClientHistory(t *testing.T) {
+	grader := publish.NewGrader()
+	plan := &model.GrayPlan{
+		App:              "app",
+		Group:            "group",
+		Percent:          100,
+		CapturedRevision: 5,
+	}
+	if !grader.Evaluate(plan) {
+		t.Fatal("new client with no history must still be eligible under full rollout")
 	}
 }
 
