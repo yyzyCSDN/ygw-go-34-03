@@ -1,0 +1,11 @@
+*.log
+*.jsonl
+.git
+.verification-cache
+private_oracles
+cases
+workspaces
+gold-results
+evidence
+runner
+verify-workspaces
