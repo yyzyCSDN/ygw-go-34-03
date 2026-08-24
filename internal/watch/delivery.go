@@ -76,11 +76,11 @@ func (c *Conn) Session() string {
 }
 
 func (c *Conn) Deliver(ev model.Event) error {
-	c.mu.Lock()
-	if ev.Revision > c.cursor {
-		c.cursor = ev.Revision
-	}
-	c.mu.Unlock()
+	// The cursor must only advance once the change is applied and acked.
+	// Advancing here would mark an un-acked delivery as committed and let
+	// reconnect catch-up skip past it, dropping the message. ApplyEvent is
+	// responsible for moving the cursor on success; a failed delivery stays
+	// put for retry.
 	select {
 	case c.queue <- model.Delivery{Event: ev, SentAt: time.Now().UTC()}:
 		return nil
